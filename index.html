@@ -151,6 +151,50 @@
     .btn-ghost{ background:var(--sky); color:var(--blue2); border:2px solid var(--border); }
     .btn-danger{ background:#fef2f2; color:var(--red); border:2px solid #fecaca; }
 
+    /* ─── Category Cards ─── */
+#category-screen { display: block; }
+#product-screen  { display: none;  }
+
+.cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+}
+.cat-card {
+  background: #fff;
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 24px 12px;
+  text-align: center;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all .2s;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06);
+}
+.cat-card:hover, .cat-card:active {
+  border-color: #6366f1;
+  background: #eef2ff;
+  transform: translateY(-2px);
+}
+.cat-card .cat-icon { font-size: 2rem; margin-bottom: 8px; }
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #6366f1;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 12px;
+}
+.btn-back:hover { text-decoration: underline; }
+
     /* TOAST */
     .toast{
       margin:0 14px 14px; padding:13px 15px; border-radius:13px;
@@ -184,7 +228,20 @@
   </svg>
 
   <div id="app">
+<!-- หน้าเลือกหมวดหมู่ -->
+<div id="category-screen">
+  <h2 style="margin-bottom:4px;">🛍️ เลือกหมวดหมู่</h2>
+  <p style="color:#6b7280;margin-top:0;">กดหมวดหมู่เพื่อดูสินค้า</p>
+  <div class="cat-grid" id="cat-grid"></div>
+</div>
 
+<!-- หน้าแสดงสินค้า (UI เดิม) -->
+<div id="product-screen">
+  <button class="btn-back" onclick="showCategories()">
+    ← กลับเลือกหมวดหมู่
+  </button>
+  <h2 id="cat-title" style="margin-top:0;"></h2>
+  
     <!-- Products -->
     <div class="card">
       <div class="card-header">
@@ -197,6 +254,10 @@
         <div class="skel-row"><div class="skeleton" style="width:58px;height:58px;flex-shrink:0"></div><div style="flex:1"><div class="skeleton" style="height:15px;width:72%;margin-bottom:7px"></div><div class="skeleton" style="height:13px;width:42%"></div></div></div>
       </div>
     </div>
+
+  <!-- วาง UI สินค้าเดิมของคุณไว้ตรงนี้ทั้งหมด -->
+  <div id="product-list"></div>
+</div>
 
     <!-- Total -->
     <div class="total-bar">
@@ -237,6 +298,7 @@
     <div class="toast" id="toast"></div>
     <div class="spacer"></div>
   </div>
+    
 
 <script>
   // ====================================================
@@ -249,6 +311,8 @@
   let products = [];
   let qtyMap   = {};
   let noteMap  = {};
+  let allProducts   = [];   // เก็บสินค้าทั้งหมด
+  let allCategories = [];   // เก็บหมวดหมู่ไม่ซ้ำ
 
   const money = n => "฿" + Number(n||0).toLocaleString("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2});
   const esc   = s => String(s||"").replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[m]);
@@ -266,6 +330,51 @@
     if (!res.ok) throw new Error("HTTP " + res.status);
     return res.json();
   }
+
+  // ── โหลดสินค้าจาก API (แทน function เดิมที่คุณมี) ──
+async function loadProducts() {
+  const res  = await fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "getProducts" })
+  });
+  const data = await res.json();
+  if (!data.ok) { alert("โหลดสินค้าไม่สำเร็จ"); return; }
+
+  allProducts   = data.products;
+  allCategories = [...new Set(allProducts.map(p => p.category))];
+  renderCategoryCards();
+}
+
+// ── แสดงการ์ดหมวดหมู่ ──
+function renderCategoryCards() {
+  const grid = document.getElementById("cat-grid");
+  grid.innerHTML = allCategories.map(cat => `
+    <div class="cat-card" onclick="showCategory('${cat.replace(/'/g, "\\'")}')">
+      <div class="cat-icon">🏷️</div>
+      <div>${cat}</div>
+      <div style="font-size:.8rem;color:#9ca3af;font-weight:400;margin-top:4px;">
+        ${allProducts.filter(p => p.category === cat).length} รายการ
+      </div>
+    </div>
+  `).join("");
+}
+
+// ── กดการ์ด → แสดงสินค้าในหมวด ──
+function showCategory(cat) {
+  const filtered = allProducts.filter(p => p.category === cat);
+  document.getElementById("cat-title").textContent = `🏷️ ${cat}`;
+  renderProducts(filtered);   // ← function เดิมที่คุณใช้วาด product-list
+
+  document.getElementById("category-screen").style.display = "none";
+  document.getElementById("product-screen").style.display  = "block";
+}
+
+// ── ปุ่มย้อนกลับ ──
+function showCategories() {
+  document.getElementById("product-screen").style.display  = "none";
+  document.getElementById("category-screen").style.display = "block";
+}
 
   /* ── UI helpers ── */
   function showToast(msg, ok=true){
